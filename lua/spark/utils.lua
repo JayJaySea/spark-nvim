@@ -20,4 +20,11 @@ function M.print_spark_error()
     vim.api.nvim_err_writeln(last)
 end
 
+function M.current_path()
+    local current_buf = vim.api.nvim_get_current_buf()
+    local filename = vim.api.nvim_buf_get_name(current_buf)
+
+    return filename
+end
+
 return M
