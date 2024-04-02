@@ -11,7 +11,8 @@ def main():
         "add": add_note
     }
 
-    if sys.argv[1] in options:
+    if sys.argv[1].strip() in options:
+        mk_path("/tmp/spark")
         options[sys.argv[1]]()
 
     else:
@@ -50,7 +51,7 @@ def rofi_choose(items: list, label: str) -> bool:
 def open_note_by_id(note_id):
     path = "/tmp/spark/" + note_id + ".spark.md"
     subprocess.call(["spark", "get", "note", note_id, "--path", path], stderr=open("/dev/null"))
-    subprocess.call(["nvim", path])
+    subprocess.call(["alacritty", "-e", "nvim", path])
 
 def add_note():
     template = """#
@@ -60,17 +61,20 @@ def add_note():
 ### External"""
 
     filepath = "/tmp/spark/new_note.spark.md"
-    if not os.path.exists(os.path.dirname(filepath)):
-        try:
-            os.makedirs(os.path.dirname(filepath))
-        except OSError as exc: 
-            if exc.errno != errno.EEXIST:
-                raise
+    mk_path(filepath)
 
     with open(filepath, "w") as f:
         f.write(template)
 
     subprocess.call(["nvim", filepath])
+
+def mk_path(path):
+    if not os.path.exists(os.path.dirname(path)):
+        try:
+            os.makedirs(os.path.dirname(path))
+        except OSError as exc: 
+            if exc.errno != errno.EEXIST:
+                raise
 
 if __name__ == "__main__":
     main()
