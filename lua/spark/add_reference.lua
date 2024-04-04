@@ -8,43 +8,7 @@ local utils = require("spark.utils")
 
 local M = {}
 
-function M.setup_data()
-    vim.print(globals)
-    local ids_cmd = "spark list notes --id > " .. globals.idspath .. " 2> " .. globals.logpath
-    local titles_cmd = "spark list notes --title > " .. globals.titlespath .. " 2> " .. globals.logpath
-    local status = os.execute(ids_cmd .. ";" .. titles_cmd)
 
-    if status ~= 0 then
-        utils.print_spark_error()
-    end
-end
-
-function M.get_ids()
-    local results = {}
-    for id in io.lines(globals.idspath) do
-        table.insert(results, id)
-    end
-
-    return results
-end
-
-function M.get_titles()
-    local results = {}
-    for title in io.lines(globals.titlespath) do
-        table.insert(results, title)
-    end
-
-    return results
-end
-
-function M.index_of(array, value)
-    for i, v in ipairs(array) do
-        if v == value then
-            return i
-        end
-    end
-    return nil
-end
 
 function M.find_place_for_internal_ref()
     local no = 0
@@ -54,7 +18,7 @@ function M.find_place_for_internal_ref()
 
     local current_buf = vim.api.nvim_get_current_buf()
     local lines = vim.api.nvim_buf_get_lines(current_buf, 0, -1, false)
-    for i, line in ipairs(lines) do
+    for _, line in ipairs(lines) do
         line = utils.trim(line)
         if start and line ~= "" then
             no = no + 1
@@ -73,24 +37,72 @@ function M.find_place_for_internal_ref()
             break
         end
 
-        location = i
+        if start and line ~= "" then
+            location = location + 1
+        end
+        if not start then
+            location = location + 1
+        end
     end
 
-    return no, location - 1
+    return no, location
 end
 
-function M.write_reference(prompt_bufnr, map)
+function M.find_place_for_external_ref()
+    local no = 0
+    local location = 0
+    local references_section = false
+    local start = false
+
+    local current_buf = vim.api.nvim_get_current_buf()
+    local lines = vim.api.nvim_buf_get_lines(current_buf, 0, -1, false)
+    for i, line in ipairs(lines) do
+        line = utils.trim(line)
+        if start and line ~= "" then
+            no = no + 1
+        end
+
+        if line == "## References" then
+            references_section = true
+        end
+
+        if line == "### External" and references_section then
+            start = true
+        end
+
+        if start and line ~= "" then
+            location = location + 1
+        end
+        if not start then
+            location = location + 1
+        end
+    end
+
+    return location
+end
+
+function M.write_reference(prompt_bufnr, map, type)
     actions.select_default:replace(
     function()
         actions.close(prompt_bufnr)
 
-        local ids = M.get_ids()
-        local titles = M.get_titles()
+        local ids = utils.get_ids()
+        local titles = utils.get_titles()
         local selection = action_state.get_selected_entry()
-        local index = M.index_of(titles, selection[1])
+        local index = utils.index_of(titles, selection[1])
 
-        local no, location = M.find_place_for_internal_ref()
-        local reference = no .. ". [" .. ids[index] .. "] " .. titles[index]
+        local no, location
+        if type == "notes" then
+            no, location = M.find_place_for_internal_ref()
+        elseif type == "sources" then
+            location = M.find_place_for_external_ref()
+        end
+        if not no then
+            no = " - "
+        else
+            no = no .. ". "
+        end
+        local reference = no .. "[" .. ids[index] .. "] " .. titles[index]
 
         local current_buf = vim.api.nvim_get_current_buf()
         vim.api.nvim_buf_set_lines(current_buf, location, location, false, { reference })
@@ -98,21 +110,19 @@ function M.write_reference(prompt_bufnr, map)
     return true
 end
 
-function M.add_note_reference(opts)
-    opts = opts or require("telescope.themes").get_dropdown{}
-    M.setup_data()
+function M.add_reference(type)
+    local opts = require("telescope.themes").get_dropdown{}
+    utils.setup_data(type)
 
     pickers.new(opts, {
-        prompt_title = "Add note as reference",
-        finder = finders.new_table { results = M.get_titles() },
+        prompt_title = "Add " .. type:sub(1, -2) .. " as reference",
+        finder = finders.new_table { results = utils.get_titles() },
         sorter = conf.generic_sorter(opts),
         attach_mappings = function (prompt_bufnr, map)
-            return M.write_reference(prompt_bufnr, map)
+            return M.write_reference(prompt_bufnr, map, type)
         end,
     }):find()
 end
-
-
 
 -- to execute the function
 -- M.add_note_reference(require("telescope.themes").get_dropdown{})

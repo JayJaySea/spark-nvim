@@ -31,6 +31,43 @@ function M.current_path()
     return filename
 end
 
+function M.setup_data(type)
+    vim.print(globals)
+    local ids_cmd = "spark list " .. type .. " --id > " .. globals.idspath .. " 2> " .. globals.logpath
+    local titles_cmd = "spark list " .. type .. " --title > " .. globals.titlespath .. " 2> " .. globals.logpath
+    local status = os.execute(ids_cmd .. ";" .. titles_cmd)
+
+    if status ~= 0 then
+        M.print_spark_error()
+    end
+end
+
+function M.get_ids()
+    local results = {}
+    for id in io.lines(globals.idspath) do
+        table.insert(results, id)
+    end
+
+    return results
+end
+
+function M.get_titles()
+    local results = {}
+    for title in io.lines(globals.titlespath) do
+        table.insert(results, title)
+    end
+
+    return results
+end
+
+function M.index_of(array, value)
+    for i, v in ipairs(array) do
+        if v == value then
+            return i
+        end
+    end
+    return nil
+end
 
 function M.trim(s)
    return (s:gsub("^%s*(.-)%s*$", "%1"))
